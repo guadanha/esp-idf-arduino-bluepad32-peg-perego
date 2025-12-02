@@ -6,6 +6,9 @@
 
 #include <Arduino.h>
 #include <Bluepad32.h>
+#include "ble_server.h"
+
+#include "bts7960.h"
 
 //
 // README FIRST, README FIRST, README FIRST
@@ -146,6 +149,26 @@ void dumpBalanceBoard(ControllerPtr ctl) {
     );
 }
 
+/**
+ * @brief Converte um número inteiro de 0-1023 para um número de ponto flutuante de 0.0-1.0.
+ * * @param valor_entrada O valor inteiro a ser convertido (de 0 a 1023).
+ * @return float O valor escalonado (de 0.0 a 1.0).
+ */
+float converter_escala(int input, int min_value, int max_value, int scale) {
+    // É importante usar 1023.0 (ponto flutuante) na divisão
+    // para garantir que o resultado seja um float, e não uma divisão inteira.
+    
+    // Garantir que o valor esteja dentro dos limites aceitáveis,
+    // embora no contexto do código de motor isso possa ser simplificado.
+    if (input < min_value) {
+        input = 0;
+    } else if (input > max_value) {
+        input = scale;
+    }
+
+    return (float)input / scale;
+}
+
 void processGamepad(ControllerPtr ctl) {
     // There are different ways to query whether a button is pressed.
     // By query each button individually:
@@ -195,7 +218,42 @@ void processGamepad(ControllerPtr ctl) {
     // See how the different "dump*" functions dump the Controller info.
     dumpGamepad(ctl);
 
-    // See ArduinoController.h for all the available functions.
+    if (ctl->brake()) {      // (0 - 1023): brake button
+        printf("--- FASE 3: FREIO ATIVO ---\n");
+        // Motor 1: Freio
+        motor_control(M1_RPWM_CHANNEL, M1_LPWM_CHANNEL, M1_REN_PIN, M1_LEN_PIN, 0, 0);
+        // Motor 2: Freio
+        motor_control(M2_RPWM_CHANNEL, M2_LPWM_CHANNEL, M2_REN_PIN, M2_LEN_PIN, 0, 0);
+    } else if (ctl->throttle()) {     // (0 - 1023): throttle (AKA gas) button
+        if (ctl->a()) {
+            printf("--- FASE 4: RÉ - Velocidade Única ---\n");
+            // Motor 1: Ré, V1
+            int duty = (int)(MAX_DUTY * converter_escala(ctl->throttle(), 400, 900, 1023));
+            motor_control(M1_RPWM_CHANNEL, M1_LPWM_CHANNEL, M1_REN_PIN, M1_LEN_PIN, -1, duty);
+            // Motor 2: Ré, V1
+            motor_control(M2_RPWM_CHANNEL, M2_LPWM_CHANNEL, M2_REN_PIN, M2_LEN_PIN, -1, duty);
+        } else {
+            // Motor 1: Frente, V1
+            int duty = (int)(MAX_DUTY * converter_escala(ctl->throttle(), 400, 900, 1023));
+            motor_control(M1_RPWM_CHANNEL, M1_LPWM_CHANNEL, M1_REN_PIN, M1_LEN_PIN, 1, duty);
+            // Motor 2: Frente, V1
+            motor_control(M2_RPWM_CHANNEL, M2_LPWM_CHANNEL, M2_REN_PIN, M2_LEN_PIN, 1, duty);
+
+            // printf("--- FASE 2: FRENTE - Velocidade 2 (Rápida) ---\n");
+            // // Motor 1: Frente, V2
+            // motor_control(M1_RPWM_CHANNEL, M1_LPWM_CHANNEL, M1_EN_PIN, 1, VELOCIDADE_FRENTE_2);
+            // // Motor 2: Frente, V2
+            // motor_control(M2_RPWM_CHANNEL, M2_LPWM_CHANNEL, M2_EN_PIN, 1, VELOCIDADE_FRENTE_2);        
+        }
+   
+    } else {
+        gpio_set_level(M1_REN_PIN, 0);
+        gpio_set_level(M2_REN_PIN, 0);
+        gpio_set_level(M1_LEN_PIN, 0);
+        gpio_set_level(M2_LEN_PIN, 0);
+    }
+    
+   // See ArduinoController.h for all the available functions.
 }
 
 void processMouse(ControllerPtr ctl) {
@@ -300,6 +358,15 @@ void setup() {
     // This service allows clients, like a mobile app, to setup and see the state of Bluepad32.
     // By default, it is disabled.
     BP32.enableBLEService(false);
+
+    BP32.enableNewBluetoothConnections(false);
+
+    BLE_SERVER_SETUP();
+
+    Console.begin(115200);
+
+    ledc_init();
+
 }
 
 // Arduino loop function. Runs in CPU 1.

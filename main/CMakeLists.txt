@@ -1,6 +1,8 @@
 set(srcs
         "main.c"
-        "sketch.cpp")
+        "sketch.cpp"
+        "bts7960.c"
+        "ble_server.cpp")
 
 set(requires "bluepad32" "bluepad32_arduino" "arduino" "btstack")
 

@@ -162,6 +162,8 @@ void dumpBalanceBoard(ControllerPtr ctl) {
 int map_range(int value, int in_min, int in_max, int out_min, int out_max) {
     if (value < in_min) {
         return 0;
+    } else if (value > (in_max - 20)) {
+        value = in_max;
     }
     // Evita divisão por zero.
     if (in_min == in_max) {
@@ -225,7 +227,7 @@ void processGamepad(ControllerPtr ctl) {
 
     // Another way to query controller data is by getting the buttons() function.
     // See how the different "dump*" functions dump the Controller info.
-    //dumpGamepad(ctl);
+    dumpGamepad(ctl);
 
     if (ctl->brake()) {      // (0 - 1023): brake button
         printf("--- FASE 3: FREIO ATIVO ---\n");
@@ -238,7 +240,7 @@ void processGamepad(ControllerPtr ctl) {
         if (ctl->a()) {
             // Motor 1: Ré, V1
             int duty = map_range(ctl->throttle(), 150, 1023, 150, 500);
-            Console.printf("--- FASE 4: RÉ  Velocidade Única --- %d, thoro %d\n", duty, ctl->throttle());
+            Console.printf("--- FASE 4: RÉ  Velocidade Única --- %d, throttle %d\n", duty, ctl->throttle());
 
             motor_control(M1_RPWM_CHANNEL, M1_LPWM_CHANNEL, M1_REN_PIN, M1_LEN_PIN, -1, duty);
             // Motor 2: Ré, V1
@@ -258,19 +260,10 @@ void processGamepad(ControllerPtr ctl) {
             motor_control(M1_RPWM_CHANNEL, M1_LPWM_CHANNEL, M1_REN_PIN, M1_LEN_PIN, 1, duty);
             // Motor 2: Frente, V1
             motor_control(M2_RPWM_CHANNEL, M2_LPWM_CHANNEL, M2_REN_PIN, M2_LEN_PIN, 1, duty);
-
-            // printf("--- FASE 2: FRENTE - Velocidade 2 (Rápida) ---\n");
-            // // Motor 1: Frente, V2
-            // motor_control(M1_RPWM_CHANNEL, M1_LPWM_CHANNEL, M1_EN_PIN, 1, VELOCIDADE_FRENTE_2);
-            // // Motor 2: Frente, V2
-            // motor_control(M2_RPWM_CHANNEL, M2_LPWM_CHANNEL, M2_EN_PIN, 1, VELOCIDADE_FRENTE_2);        
         }
-   
-    } else {
+    } else { // Motor 2: Freio
         motor_control(M1_RPWM_CHANNEL, M1_LPWM_CHANNEL, M1_REN_PIN, M1_LEN_PIN, 2, 0);
-        // Motor 2: Freio
         motor_control(M2_RPWM_CHANNEL, M2_LPWM_CHANNEL, M2_REN_PIN, M2_LEN_PIN, 2, 0);
-        Console.printf("off\n");
     }
     
    // See ArduinoController.h for all the available functions.

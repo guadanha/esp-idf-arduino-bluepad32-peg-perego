@@ -49,8 +49,8 @@ void motor_control(ledc_channel_t rpwm_ch, ledc_channel_t lpwm_ch, gpio_num_t re
         duty = 0;
     } else if (duty > duty_) {
         duty = duty_;
-    } else if (duty <= (duty_ + 20)) {
-        duty = duty + 20;
+    } else if (duty <= (duty_ + 50)) {
+        duty = duty + 50;
     } else {
         duty = duty_;
     }

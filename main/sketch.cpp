@@ -150,26 +150,34 @@ void dumpBalanceBoard(ControllerPtr ctl) {
 }
 
 /**
- * @brief Converte um número inteiro de 0-1023 para um número de ponto flutuante de 0.0-1.0.
- * * @param valor_entrada O valor inteiro a ser convertido (de 0 a 1023).
- * @return float O valor escalonado (de 0.0 a 1.0).
+ * @brief Mapeia um valor de um intervalo para outro de forma linear.
+ *
+ * @param value O valor a ser mapeado.
+ * @param in_min O limite inferior da faixa de entrada.
+ * @param in_max O limite superior da faixa de entrada.
+ * @param out_min O limite inferior da faixa de saída.
+ * @param out_max O limite superior da faixa de saída.
+ * @return O valor mapeado na faixa de saída.
  */
-float converter_escala(int input, int min_value, int max_value, int scale) {
-    // É importante usar 1023.0 (ponto flutuante) na divisão
-    // para garantir que o resultado seja um float, e não uma divisão inteira.
-    
-    // Garantir que o valor esteja dentro dos limites aceitáveis,
-    // embora no contexto do código de motor isso possa ser simplificado.
-    if (input < min_value) {
-        input = 0;
-    } else if (input > max_value) {
-        input = scale;
+int map_range(int value, int in_min, int in_max, int out_min, int out_max) {
+    if (value < in_min) {
+        return 0;
+    }
+    // Evita divisão por zero.
+    if (in_min == in_max) {
+        return out_min; // Ou outro valor de erro/limite
     }
 
-    return (float)input / scale;
+    // Fórmula de mapeamento linear:
+    // (Valor - Mínimo Entrada) * (Máximo Saída - Mínimo Saída) / (Máximo Entrada - Mínimo Entrada) + Mínimo Saída
+    
+    // Usamos (long) para evitar overflow em cálculos intermediários 
+    // antes da divisão, garantindo precisão mesmo com 'int'.
+    return (int)((long)(value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min);
 }
 
 void processGamepad(ControllerPtr ctl) {
+    static int marcha = 0;
     // There are different ways to query whether a button is pressed.
     // By query each button individually:
     //  a(), b(), x(), y(), l1(), etc...
@@ -206,6 +214,7 @@ void processGamepad(ControllerPtr ctl) {
     }
 
     if (ctl->x()) {
+        marcha = 1;
         // Some gamepads like DS3, DS4, DualSense, Switch, Xbox One S, Stadia support rumble.
         // It is possible to set it by calling:
         // Some controllers have two motors: "strong motor", "weak motor".
@@ -216,7 +225,7 @@ void processGamepad(ControllerPtr ctl) {
 
     // Another way to query controller data is by getting the buttons() function.
     // See how the different "dump*" functions dump the Controller info.
-    dumpGamepad(ctl);
+    //dumpGamepad(ctl);
 
     if (ctl->brake()) {      // (0 - 1023): brake button
         printf("--- FASE 3: FREIO ATIVO ---\n");
@@ -224,17 +233,28 @@ void processGamepad(ControllerPtr ctl) {
         motor_control(M1_RPWM_CHANNEL, M1_LPWM_CHANNEL, M1_REN_PIN, M1_LEN_PIN, 0, 0);
         // Motor 2: Freio
         motor_control(M2_RPWM_CHANNEL, M2_LPWM_CHANNEL, M2_REN_PIN, M2_LEN_PIN, 0, 0);
+        marcha = 0;
     } else if (ctl->throttle()) {     // (0 - 1023): throttle (AKA gas) button
         if (ctl->a()) {
-            printf("--- FASE 4: RÉ - Velocidade Única ---\n");
             // Motor 1: Ré, V1
-            int duty = (int)(MAX_DUTY * converter_escala(ctl->throttle(), 400, 900, 1023));
+            int duty = map_range(ctl->throttle(), 150, 1023, 150, 500);
+            Console.printf("--- FASE 4: RÉ  Velocidade Única --- %d, thoro %d\n", duty, ctl->throttle());
+
             motor_control(M1_RPWM_CHANNEL, M1_LPWM_CHANNEL, M1_REN_PIN, M1_LEN_PIN, -1, duty);
             // Motor 2: Ré, V1
             motor_control(M2_RPWM_CHANNEL, M2_LPWM_CHANNEL, M2_REN_PIN, M2_LEN_PIN, -1, duty);
+            marcha = 0;
         } else {
+            int duty = 0;
+            if (marcha == 0) {
+                duty = map_range(ctl->throttle(), 150, 1023, 150, 500);
+            } else {
+                duty = map_range(ctl->throttle(), 150, 1023, 150, 1023);
+            }
             // Motor 1: Frente, V1
-            int duty = (int)(MAX_DUTY * converter_escala(ctl->throttle(), 400, 900, 1023));
+            
+            Console.printf("--- FASE 4: Frente  Velocidade Única --- %d marcha %d\n", duty, marcha);
+
             motor_control(M1_RPWM_CHANNEL, M1_LPWM_CHANNEL, M1_REN_PIN, M1_LEN_PIN, 1, duty);
             // Motor 2: Frente, V1
             motor_control(M2_RPWM_CHANNEL, M2_LPWM_CHANNEL, M2_REN_PIN, M2_LEN_PIN, 1, duty);
@@ -247,10 +267,10 @@ void processGamepad(ControllerPtr ctl) {
         }
    
     } else {
-        gpio_set_level(M1_REN_PIN, 0);
-        gpio_set_level(M2_REN_PIN, 0);
-        gpio_set_level(M1_LEN_PIN, 0);
-        gpio_set_level(M2_LEN_PIN, 0);
+        motor_control(M1_RPWM_CHANNEL, M1_LPWM_CHANNEL, M1_REN_PIN, M1_LEN_PIN, 2, 0);
+        // Motor 2: Freio
+        motor_control(M2_RPWM_CHANNEL, M2_LPWM_CHANNEL, M2_REN_PIN, M2_LEN_PIN, 2, 0);
+        Console.printf("off\n");
     }
     
    // See ArduinoController.h for all the available functions.

@@ -43,7 +43,17 @@ void ledc_init(void) {
 /**
  * @brief Controla a direção, velocidade e freio de um motor.
  */
-void motor_control(ledc_channel_t rpwm_ch, ledc_channel_t lpwm_ch, gpio_num_t ren_pin, gpio_num_t len_pin, int direction, int duty) {
+void motor_control(ledc_channel_t rpwm_ch, ledc_channel_t lpwm_ch, gpio_num_t ren_pin, gpio_num_t len_pin, int direction, int duty_) {
+    static int duty = 0;
+    if (duty_ == 0) {
+        duty = 0;
+    } else if (duty > duty_) {
+        duty = duty_;
+    } else if (duty <= (duty_ + 20)) {
+        duty = duty + 20;
+    } else {
+        duty = duty_;
+    }
     // Habilita o driver (necessário para girar e para freio ativo)
     if (direction == 1) { // FRENTE
         ledc_set_duty(LEDC_MODE, rpwm_ch, duty);
@@ -59,12 +69,19 @@ void motor_control(ledc_channel_t rpwm_ch, ledc_channel_t lpwm_ch, gpio_num_t re
         ledc_set_duty(LEDC_MODE, lpwm_ch, duty);
         ledc_update_duty(LEDC_MODE, lpwm_ch);
         gpio_set_level(len_pin, 1);
-    } else { // 0: FREIO ATIVO (Curto-circuito em GND: Duty 0 em ambos os pinos)
+    } else if (direction == 0) { // 0: FREIO ATIVO (Curto-circuito em GND: Duty 0 em ambos os pinos)
         ledc_set_duty(LEDC_MODE, rpwm_ch, 0);
         ledc_update_duty(LEDC_MODE, rpwm_ch);
         gpio_set_level(ren_pin, 1);
         ledc_set_duty(LEDC_MODE, lpwm_ch, 0);
         ledc_update_duty(LEDC_MODE, lpwm_ch);
         gpio_set_level(len_pin, 1);
+    } else {
+        ledc_set_duty(LEDC_MODE, rpwm_ch, 0);
+        ledc_update_duty(LEDC_MODE, rpwm_ch);
+        gpio_set_level(ren_pin, 0);
+        ledc_set_duty(LEDC_MODE, lpwm_ch, 0);
+        ledc_update_duty(LEDC_MODE, lpwm_ch);
+        gpio_set_level(len_pin, 0);
     }
 }

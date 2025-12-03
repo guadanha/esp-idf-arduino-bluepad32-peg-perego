@@ -44,9 +44,9 @@ void ledc_init(void) {
  * @brief Controla a direção, velocidade e freio de um motor.
  */
 void motor_control(ledc_channel_t rpwm_ch, ledc_channel_t lpwm_ch, gpio_num_t ren_pin, gpio_num_t len_pin, int direction, int duty_) {
-    static int duty = 0;
+    static int duty = 150;
     if (duty_ == 0) {
-        duty = 0;
+        duty = 150;
     } else if (duty > duty_) {
         duty = duty_;
     } else if (duty <= (duty_ + 50)) {

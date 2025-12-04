@@ -134,11 +134,10 @@ void processGamepad(ControllerPtr ctl) {
 
     static int state = 0;
     if (ctl->brake()) { // (0 - 1023): brake button
-        marcha = 0;
-        motor_control(M1_RPWM_CHANNEL, M1_LPWM_CHANNEL, M1_REN_PIN, M1_LEN_PIN, 0, 0);
-        motor_control(M2_RPWM_CHANNEL, M2_LPWM_CHANNEL, M2_REN_PIN, M2_LEN_PIN, 0, 0);
-        
         if (state != 1) {
+            marcha = 0;
+            motor_control(M1_RPWM_CHANNEL, M1_LPWM_CHANNEL, M1_REN_PIN, M1_LEN_PIN, 0, 0);
+            motor_control(M2_RPWM_CHANNEL, M2_LPWM_CHANNEL, M2_REN_PIN, M2_LEN_PIN, 0, 0);
             // orange
             ctl->setColorLED(255, 165, 0);
             state = 1;
@@ -148,14 +147,25 @@ void processGamepad(ControllerPtr ctl) {
         int duty_t = map_range(ctl->throttle(), 15, 1023, 150, 800);
         int duty_ry = map_range(ctl->axisRY(), 15, 512, 150, 800);
         int duty = duty_t >= duty_ry ? duty_t : duty_ry;
-
-        motor_control(M1_RPWM_CHANNEL, M1_LPWM_CHANNEL, M1_REN_PIN, M1_LEN_PIN, -1, duty);
-        motor_control(M2_RPWM_CHANNEL, M2_LPWM_CHANNEL, M2_REN_PIN, M2_LEN_PIN, -1, duty);
+        int duty_r, duty_l = duty;
         
-        static int old_duty = 0;
-        if (duty != old_duty) {
+        if (abs(ctl->axisX()) > 15) {
+            int dir = map_range(abs(ctl->axisX()), 15, 512, 150, 800);
+            if (ctl->axisX() > 0) {
+                duty_l = duty_l - dir;
+            } else {
+                duty_r = duty_r - dir;
+            }
+        }
+
+        static int old_duty_l = 0;
+        static int old_duty_r = 0;
+        if (duty_l != old_duty_l || duty_r != old_duty_r) {
+            motor_control(M1_RPWM_CHANNEL, M1_LPWM_CHANNEL, M1_REN_PIN, M1_LEN_PIN, -1, duty_l);
+            motor_control(M2_RPWM_CHANNEL, M2_LPWM_CHANNEL, M2_REN_PIN, M2_LEN_PIN, -1, duty_r);
             Console.printf("RÉ duty: %d, throttle: %d, axixRY %d\n", duty, ctl->throttle(), ctl->axisRY());
-            old_duty = duty;
+            old_duty_l = duty_l;
+            old_duty_r = duty_r;
         }
         if (state != 2) {
             // yelow
@@ -184,13 +194,14 @@ void processGamepad(ControllerPtr ctl) {
             }
         }
 
-        motor_control(M1_RPWM_CHANNEL, M1_LPWM_CHANNEL, M1_REN_PIN, M1_LEN_PIN, 1, duty_l);
-        motor_control(M2_RPWM_CHANNEL, M2_LPWM_CHANNEL, M2_REN_PIN, M2_LEN_PIN, 1, duty_r);
-
-        static int old_duty = 0;
-        if (duty != old_duty) {
+        static int old_duty_l = 0;
+        static int old_duty_r = 0;
+        if (duty_l != old_duty_l || duty_r != old_duty_r) {
+            motor_control(M1_RPWM_CHANNEL, M1_LPWM_CHANNEL, M1_REN_PIN, M1_LEN_PIN, 1, duty_l);
+            motor_control(M2_RPWM_CHANNEL, M2_LPWM_CHANNEL, M2_REN_PIN, M2_LEN_PIN, 1, duty_r);
             Console.printf("Frente duty: %d marcha %d throttle: %d, axixRY %d axixX %d\n", duty, marcha, ctl->throttle(), ctl->axisRY(), ctl->axisX());
-            old_duty = duty;
+            old_duty_l = duty_l;
+            old_duty_r = duty_r;
         }
         static int old_marcha = 0;
         if (state != 3 || old_marcha != marcha) {
@@ -204,10 +215,9 @@ void processGamepad(ControllerPtr ctl) {
             old_marcha = marcha;
         }
     } else { // Motor disable
-        motor_control(M1_RPWM_CHANNEL, M1_LPWM_CHANNEL, M1_REN_PIN, M1_LEN_PIN, 2, 0);
-        motor_control(M2_RPWM_CHANNEL, M2_LPWM_CHANNEL, M2_REN_PIN, M2_LEN_PIN, 2, 0);
-
         if (state != 4) {
+            motor_control(M1_RPWM_CHANNEL, M1_LPWM_CHANNEL, M1_REN_PIN, M1_LEN_PIN, 2, 0);
+            motor_control(M2_RPWM_CHANNEL, M2_LPWM_CHANNEL, M2_REN_PIN, M2_LEN_PIN, 2, 0);
             // white
             ctl->setColorLED(255, 255, 255);
             state = 4;

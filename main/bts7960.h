@@ -28,22 +28,17 @@ L_EN,GPIO 14,Habilita o lado esquerdo
 #define LEDC_DUTY_RES           LEDC_TIMER_10_BIT // 10 bits de resolução (0-1023)
 #define MAX_DUTY                ((1 << LEDC_DUTY_RES) - 1) // 1023
 
-// --- Níveis de Velocidade (Duty Cycle) ---
-#define VELOCIDADE_FRENTE_1     (MAX_DUTY / 2) // ~50%
-#define VELOCIDADE_FRENTE_2     (MAX_DUTY * 0.83) // ~83%
-#define VELOCIDADE_RETO_1       (MAX_DUTY * 0.39) // ~39%
-
 // --- Pinos de Controle e Canais LEDC ---
 // Motor 1 (Ex: Direita)
 #define M1_REN_PIN              GPIO_NUM_32
-#define M1_LEN_PIN              GPIO_NUM_27
+#define M1_LEN_PIN              GPIO_NUM_33
 #define M1_RPWM_PIN             GPIO_NUM_25
 #define M1_LPWM_PIN             GPIO_NUM_26
 #define M1_RPWM_CHANNEL         LEDC_CHANNEL_0
 #define M1_LPWM_CHANNEL         LEDC_CHANNEL_1
 
 // Motor 2 (Ex: Esquerda)
-#define M2_REN_PIN              GPIO_NUM_35
+#define M2_REN_PIN              GPIO_NUM_27
 #define M2_LEN_PIN              GPIO_NUM_14
 #define M2_RPWM_PIN             GPIO_NUM_13
 #define M2_LPWM_PIN             GPIO_NUM_12

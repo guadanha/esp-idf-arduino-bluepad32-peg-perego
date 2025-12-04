@@ -53,7 +53,6 @@ void BLE_SERVER_SETUP() {
     gap_advertisements_enable(1);
 
     Console.printf("Init server\n");
-    Console.printf("Init server\n");
 }
 
 /*

@@ -6,6 +6,7 @@
 
 #include <Arduino.h>
 #include <Bluepad32.h>
+#include <math.h>
 #include "ble_server.h"
 
 #include "bts7960.h"
@@ -56,7 +57,11 @@ void onDisconnectedController(ControllerPtr ctl) {
             Console.printf("CALLBACK: Controller disconnected from index=%d\n", i);
             myControllers[i] = nullptr;
             foundController = true;
-            break;
+            motor_control(M1_RPWM_CHANNEL, M1_LPWM_CHANNEL, M1_REN_PIN, M1_LEN_PIN, 2, 0);
+            motor_control(M2_RPWM_CHANNEL, M2_LPWM_CHANNEL, M2_REN_PIN, M2_LEN_PIN, 2, 0);
+
+            ctl->setColorLED(255, 0, 0);
+            ctl->playDualRumble(0, 250, 0x80, 0x40);
         }
     }
 
@@ -85,67 +90,6 @@ void dumpGamepad(ControllerPtr ctl) {
         ctl->accelX(),       // Accelerometer X
         ctl->accelY(),       // Accelerometer Y
         ctl->accelZ()        // Accelerometer Z
-    );
-}
-
-void dumpMouse(ControllerPtr ctl) {
-    Console.printf("idx=%d, buttons: 0x%04x, scrollWheel=0x%04x, delta X: %4d, delta Y: %4d\n",
-                   ctl->index(),        // Controller Index
-                   ctl->buttons(),      // bitmask of pressed buttons
-                   ctl->scrollWheel(),  // Scroll Wheel
-                   ctl->deltaX(),       // (-511 - 512) left X Axis
-                   ctl->deltaY()        // (-511 - 512) left Y axis
-    );
-}
-
-void dumpKeyboard(ControllerPtr ctl) {
-    static const char* key_names[] = {
-        // clang-format off
-        // To avoid having too much noise in this file, only a few keys are mapped to strings.
-        // Starts with "A", which is offset 4.
-        "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V",
-        "W", "X", "Y", "Z", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0",
-        // Special keys
-        "Enter", "Escape", "Backspace", "Tab", "Spacebar", "Underscore", "Equal", "OpenBracket", "CloseBracket",
-        "Backslash", "Tilde", "SemiColon", "Quote", "GraveAccent", "Comma", "Dot", "Slash", "CapsLock",
-        // Function keys
-        "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
-        // Cursors and others
-        "PrintScreen", "ScrollLock", "Pause", "Insert", "Home", "PageUp", "Delete", "End", "PageDown",
-        "RightArrow", "LeftArrow", "DownArrow", "UpArrow",
-        // clang-format on
-    };
-    static const char* modifier_names[] = {
-        // clang-format off
-        // From 0xe0 to 0xe7
-        "Left Control", "Left Shift", "Left Alt", "Left Meta",
-        "Right Control", "Right Shift", "Right Alt", "Right Meta",
-        // clang-format on
-    };
-    Console.printf("idx=%d, Pressed keys: ", ctl->index());
-    for (int key = Keyboard_A; key <= Keyboard_UpArrow; key++) {
-        if (ctl->isKeyPressed(static_cast<KeyboardKey>(key))) {
-            const char* keyName = key_names[key - 4];
-            Console.printf("%s,", keyName);
-        }
-    }
-    for (int key = Keyboard_LeftControl; key <= Keyboard_RightMeta; key++) {
-        if (ctl->isKeyPressed(static_cast<KeyboardKey>(key))) {
-            const char* keyName = modifier_names[key - 0xe0];
-            Console.printf("%s,", keyName);
-        }
-    }
-    Console.printf("\n");
-}
-
-void dumpBalanceBoard(ControllerPtr ctl) {
-    Console.printf("idx=%d,  TL=%u, TR=%u, BL=%u, BR=%u, temperature=%d\n",
-                   ctl->index(),        // Controller Index
-                   ctl->topLeft(),      // top-left scale
-                   ctl->topRight(),     // top-right scale
-                   ctl->bottomLeft(),   // bottom-left scale
-                   ctl->bottomRight(),  // bottom-right scale
-                   ctl->temperature()   // temperature: used to adjust the scale value's precision
     );
 }
 
@@ -180,143 +124,98 @@ int map_range(int value, int in_min, int in_max, int out_min, int out_max) {
 
 void processGamepad(ControllerPtr ctl) {
     static int marcha = 0;
-    // There are different ways to query whether a button is pressed.
-    // By query each button individually:
-    //  a(), b(), x(), y(), l1(), etc...
-    if (ctl->a()) {
-        static int colorIdx = 0;
-        // Some gamepads like DS4 and DualSense support changing the color LED.
-        // It is possible to change it by calling:
-        switch (colorIdx % 3) {
-            case 0:
-                // Red
-                ctl->setColorLED(255, 0, 0);
-                break;
-            case 1:
-                // Green
-                ctl->setColorLED(0, 255, 0);
-                break;
-            case 2:
-                // Blue
-                ctl->setColorLED(0, 0, 255);
-                break;
-        }
-        colorIdx++;
-    }
-
-    if (ctl->b()) {
-        // Turn on the 4 LED. Each bit represents one LED.
-        static int led = 0;
-        led++;
-        // Some gamepads like the DS3, DualSense, Nintendo Wii, Nintendo Switch
-        // support changing the "Player LEDs": those 4 LEDs that usually indicate
-        // the "gamepad seat".
-        // It is possible to change them by calling:
-        ctl->setPlayerLEDs(led & 0x0f);
-    }
-
     if (ctl->x()) {
         marcha = 1;
-        // Some gamepads like DS3, DS4, DualSense, Switch, Xbox One S, Stadia support rumble.
-        // It is possible to set it by calling:
-        // Some controllers have two motors: "strong motor", "weak motor".
-        // It is possible to control them independently.
-        ctl->playDualRumble(0 /* delayedStartMs */, 250 /* durationMs */, 0x80 /* weakMagnitude */,
-                            0x40 /* strongMagnitude */);
+        ctl->playDualRumble(0, 250, 0x80, 0x40);
+    } else if (ctl->b()) {
+        marcha = 0;
+        ctl->playDualRumble(0, 250, 0x80, 0x40);
     }
 
-    // Another way to query controller data is by getting the buttons() function.
-    // See how the different "dump*" functions dump the Controller info.
-    dumpGamepad(ctl);
-
-    if (ctl->brake()) {      // (0 - 1023): brake button
-        printf("--- FASE 3: FREIO ATIVO ---\n");
-        // Motor 1: Freio
-        motor_control(M1_RPWM_CHANNEL, M1_LPWM_CHANNEL, M1_REN_PIN, M1_LEN_PIN, 0, 0);
-        // Motor 2: Freio
-        motor_control(M2_RPWM_CHANNEL, M2_LPWM_CHANNEL, M2_REN_PIN, M2_LEN_PIN, 0, 0);
+    static int state = 0;
+    if (ctl->brake()) { // (0 - 1023): brake button
         marcha = 0;
-    } else if (ctl->throttle()) {     // (0 - 1023): throttle (AKA gas) button
-        if (ctl->a()) {
-            // Motor 1: Ré, V1
-            int duty = map_range(ctl->throttle(), 150, 1023, 150, 500);
-            Console.printf("--- FASE 4: RÉ  Velocidade Única --- %d, throttle %d\n", duty, ctl->throttle());
-
-            motor_control(M1_RPWM_CHANNEL, M1_LPWM_CHANNEL, M1_REN_PIN, M1_LEN_PIN, -1, duty);
-            // Motor 2: Ré, V1
-            motor_control(M2_RPWM_CHANNEL, M2_LPWM_CHANNEL, M2_REN_PIN, M2_LEN_PIN, -1, duty);
-            marcha = 0;
-        } else {
-            int duty = 0;
-            if (marcha == 0) {
-                duty = map_range(ctl->throttle(), 150, 1023, 150, 500);
-            } else {
-                duty = map_range(ctl->throttle(), 150, 1023, 150, 1023);
-            }
-            // Motor 1: Frente, V1
-            
-            Console.printf("--- FASE 4: Frente  Velocidade Única --- %d marcha %d\n", duty, marcha);
-
-            motor_control(M1_RPWM_CHANNEL, M1_LPWM_CHANNEL, M1_REN_PIN, M1_LEN_PIN, 1, duty);
-            // Motor 2: Frente, V1
-            motor_control(M2_RPWM_CHANNEL, M2_LPWM_CHANNEL, M2_REN_PIN, M2_LEN_PIN, 1, duty);
+        motor_control(M1_RPWM_CHANNEL, M1_LPWM_CHANNEL, M1_REN_PIN, M1_LEN_PIN, 0, 0);
+        motor_control(M2_RPWM_CHANNEL, M2_LPWM_CHANNEL, M2_REN_PIN, M2_LEN_PIN, 0, 0);
+        
+        if (state != 1) {
+            // orange
+            ctl->setColorLED(255, 165, 0);
+            state = 1;
         }
-    } else { // Motor 2: Freio
+    } else if ((ctl->a() && ctl->throttle()) || (ctl->axisRY() > 15)) {
+        marcha = 0;
+        int duty_t = map_range(ctl->throttle(), 15, 1023, 150, 800);
+        int duty_ry = map_range(ctl->axisRY(), 15, 512, 150, 800);
+        int duty = duty_t >= duty_ry ? duty_t : duty_ry;
+
+        motor_control(M1_RPWM_CHANNEL, M1_LPWM_CHANNEL, M1_REN_PIN, M1_LEN_PIN, -1, duty);
+        motor_control(M2_RPWM_CHANNEL, M2_LPWM_CHANNEL, M2_REN_PIN, M2_LEN_PIN, -1, duty);
+        
+        static int old_duty = 0;
+        if (duty != old_duty) {
+            Console.printf("RÉ duty: %d, throttle: %d, axixRY %d\n", duty, ctl->throttle(), ctl->axisRY());
+            old_duty = duty;
+        }
+        if (state != 2) {
+            // yelow
+            ctl->setColorLED(255, 255, 0);
+            state = 2;
+        }
+
+    } else if (ctl->throttle() || (ctl->axisRY() < -15)) {
+        int out_max = 1023;
+
+        if (marcha == 0) {
+            out_max = 600;
+        } 
+
+        int duty_t = map_range(ctl->throttle(), 15, 1023, 150, out_max);
+        int duty_ry = map_range(abs(ctl->axisRY()), 15, 512, 150, out_max);
+        int duty = duty_t >= duty_ry ? duty_t : duty_ry;
+        int duty_r, duty_l = duty;
+        
+        if (abs(ctl->axisX()) > 15) {
+            int dir = map_range(abs(ctl->axisX()), 15, 512, 150, out_max);
+            if (ctl->axisX() > 0) {
+                duty_r = duty_r - dir;
+            } else {
+                duty_l = duty_l - dir;
+            }
+        }
+
+        motor_control(M1_RPWM_CHANNEL, M1_LPWM_CHANNEL, M1_REN_PIN, M1_LEN_PIN, 1, duty_l);
+        motor_control(M2_RPWM_CHANNEL, M2_LPWM_CHANNEL, M2_REN_PIN, M2_LEN_PIN, 1, duty_r);
+
+        static int old_duty = 0;
+        if (duty != old_duty) {
+            Console.printf("Frente duty: %d marcha %d throttle: %d, axixRY %d axixX %d\n", duty, marcha, ctl->throttle(), ctl->axisRY(), ctl->axisX());
+            old_duty = duty;
+        }
+        static int old_marcha = 0;
+        if (state != 3 || old_marcha != marcha) {
+            // Light Green
+            if (marcha == 0) {
+                ctl->setColorLED(0, 125, 0);
+            } else {
+                ctl->setColorLED(0, 255, 0);
+            }
+            state = 3;
+            old_marcha = marcha;
+        }
+    } else { // Motor disable
         motor_control(M1_RPWM_CHANNEL, M1_LPWM_CHANNEL, M1_REN_PIN, M1_LEN_PIN, 2, 0);
         motor_control(M2_RPWM_CHANNEL, M2_LPWM_CHANNEL, M2_REN_PIN, M2_LEN_PIN, 2, 0);
+
+        if (state != 4) {
+            // white
+            ctl->setColorLED(255, 255, 255);
+            state = 4;
+        }
     }
-    
-   // See ArduinoController.h for all the available functions.
-}
-
-void processMouse(ControllerPtr ctl) {
-    // This is just an example.
-    if (ctl->scrollWheel() > 0) {
-        // Do Something
-    } else if (ctl->scrollWheel() < 0) {
-        // Do something else
-    }
-
-    // See "dumpMouse" for possible things to query.
-    dumpMouse(ctl);
-}
-
-void processKeyboard(ControllerPtr ctl) {
-    if (!ctl->isAnyKeyPressed())
-        return;
-
-    // This is just an example.
-    if (ctl->isKeyPressed(Keyboard_A)) {
-        // Do Something
-        Console.println("Key 'A' pressed");
-    }
-
-    // Don't do "else" here.
-    // Multiple keys can be pressed at the same time.
-    if (ctl->isKeyPressed(Keyboard_LeftShift)) {
-        // Do something else
-        Console.println("Key 'LEFT SHIFT' pressed");
-    }
-
-    // Don't do "else" here.
-    // Multiple keys can be pressed at the same time.
-    if (ctl->isKeyPressed(Keyboard_LeftArrow)) {
-        // Do something else
-        Console.println("Key 'Left Arrow' pressed");
-    }
-
-    // See "dumpKeyboard" for possible things to query.
-    dumpKeyboard(ctl);
-}
-
-void processBalanceBoard(ControllerPtr ctl) {
-    // This is just an example.
-    if (ctl->topLeft() > 10000) {
-        // Do Something
-    }
-
-    // See "dumpBalanceBoard" for possible things to query.
-    dumpBalanceBoard(ctl);
+    // Another way to query controller data is by getting the buttons() function.
+    // See how the different "dump*" functions dump the Controller info.
+    //dumpGamepad(ctl);
 }
 
 void processControllers() {
@@ -324,12 +223,6 @@ void processControllers() {
         if (myController && myController->isConnected() && myController->hasData()) {
             if (myController->isGamepad()) {
                 processGamepad(myController);
-            } else if (myController->isMouse()) {
-                processMouse(myController);
-            } else if (myController->isKeyboard()) {
-                processKeyboard(myController);
-            } else if (myController->isBalanceBoard()) {
-                processBalanceBoard(myController);
             } else {
                 Console.printf("Unsupported controller\n");
             }
@@ -379,7 +272,6 @@ void setup() {
     Console.begin(115200);
 
     ledc_init();
-
 }
 
 // Arduino loop function. Runs in CPU 1.
@@ -397,5 +289,5 @@ void loop() {
     // https://stackoverflow.com/questions/66278271/task-watchdog-got-triggered-the-tasks-did-not-reset-the-watchdog-in-time
 
     //     vTaskDelay(1);
-    delay(150);
+    delay(100);
 }

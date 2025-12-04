@@ -44,6 +44,7 @@ void ledc_init(void) {
  * @brief Controla a direção, velocidade e freio de um motor.
  */
 void motor_control(ledc_channel_t rpwm_ch, ledc_channel_t lpwm_ch, gpio_num_t ren_pin, gpio_num_t len_pin, int direction, int duty_) {
+    //acell rampup
     static int duty = 150;
     if (duty_ == 0) {
         duty = 150;
@@ -54,7 +55,12 @@ void motor_control(ledc_channel_t rpwm_ch, ledc_channel_t lpwm_ch, gpio_num_t re
     } else {
         duty = duty_;
     }
-    // Habilita o driver (necessário para girar e para freio ativo)
+
+    // defencive programmer
+    if (duty > MAX_DUTY) {
+        duty = MAX_DUTY;
+    }
+
     if (direction == 1) { // FRENTE
         ledc_set_duty(LEDC_MODE, rpwm_ch, duty);
         ledc_update_duty(LEDC_MODE, rpwm_ch);

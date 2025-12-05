@@ -32,10 +32,8 @@ void ledc_init(void) {
     }
 
     // 3. Configuração dos pinos EN (como GPIO simples)
-    gpio_set_direction(M1_REN_PIN, GPIO_MODE_OUTPUT);
-    gpio_set_direction(M2_REN_PIN, GPIO_MODE_OUTPUT);
-    gpio_set_direction(M1_LEN_PIN, GPIO_MODE_OUTPUT);
-    gpio_set_direction(M2_LEN_PIN, GPIO_MODE_OUTPUT);
+    gpio_set_direction(M1_EN_PIN, GPIO_MODE_OUTPUT);
+    gpio_set_direction(M2_EN_PIN, GPIO_MODE_OUTPUT);
 }
 
 // =========================================================
@@ -43,7 +41,7 @@ void ledc_init(void) {
 /**
  * @brief Controla a direção, velocidade e freio de um motor.
  */
-void motor_control(ledc_channel_t rpwm_ch, ledc_channel_t lpwm_ch, gpio_num_t ren_pin, gpio_num_t len_pin, int direction, int duty) {
+void motor_control(ledc_channel_t rpwm_ch, ledc_channel_t lpwm_ch, gpio_num_t en_pin,  int direction, int duty) {
     //acell rampup
     //static int duty = 100;
     //if (duty_ == 0) {
@@ -64,30 +62,28 @@ void motor_control(ledc_channel_t rpwm_ch, ledc_channel_t lpwm_ch, gpio_num_t re
     if (direction == 1) { // FRENTE
         ledc_set_duty(LEDC_MODE, rpwm_ch, duty);
         ledc_update_duty(LEDC_MODE, rpwm_ch);
-        gpio_set_level(ren_pin, 1);
         ledc_set_duty(LEDC_MODE, lpwm_ch, 0); // Desliga o outro lado
         ledc_update_duty(LEDC_MODE, lpwm_ch);
-        gpio_set_level(len_pin, 0);
+                gpio_set_level(en_pin, 1);
+
     } else if (direction == -1) { // RÉ
         ledc_set_duty(LEDC_MODE, rpwm_ch, 0); // Desliga o outro lado
         ledc_update_duty(LEDC_MODE, rpwm_ch);
-        gpio_set_level(ren_pin, 0);
         ledc_set_duty(LEDC_MODE, lpwm_ch, duty);
         ledc_update_duty(LEDC_MODE, lpwm_ch);
-        gpio_set_level(len_pin, 1);
+                gpio_set_level(en_pin, 1);
+
     } else if (direction == 0) { // 0: FREIO ATIVO (Curto-circuito em GND: Duty 0 em ambos os pinos)
+        gpio_set_level(en_pin, 1);
         ledc_set_duty(LEDC_MODE, rpwm_ch, 0);
         ledc_update_duty(LEDC_MODE, rpwm_ch);
-        gpio_set_level(ren_pin, 1);
         ledc_set_duty(LEDC_MODE, lpwm_ch, 0);
         ledc_update_duty(LEDC_MODE, lpwm_ch);
-        gpio_set_level(len_pin, 1);
     } else {
+        gpio_set_level(en_pin, 0);
         ledc_set_duty(LEDC_MODE, rpwm_ch, 0);
         ledc_update_duty(LEDC_MODE, rpwm_ch);
-        gpio_set_level(ren_pin, 0);
         ledc_set_duty(LEDC_MODE, lpwm_ch, 0);
         ledc_update_duty(LEDC_MODE, lpwm_ch);
-        gpio_set_level(len_pin, 0);
     }
 }

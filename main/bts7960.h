@@ -30,16 +30,15 @@ L_EN,GPIO 14,Habilita o lado esquerdo
 
 // --- Pinos de Controle e Canais LEDC ---
 // Motor 1 (Ex: Direita)
-#define M1_REN_PIN              GPIO_NUM_32
-#define M1_LEN_PIN              GPIO_NUM_33
+
+#define M1_EN_PIN               GPIO_NUM_27
 #define M1_RPWM_PIN             GPIO_NUM_25
 #define M1_LPWM_PIN             GPIO_NUM_26
 #define M1_RPWM_CHANNEL         LEDC_CHANNEL_0
 #define M1_LPWM_CHANNEL         LEDC_CHANNEL_1
 
 // Motor 2 (Ex: Esquerda)
-#define M2_REN_PIN              GPIO_NUM_27
-#define M2_LEN_PIN              GPIO_NUM_14
+#define M2_EN_PIN               GPIO_NUM_21
 #define M2_RPWM_PIN             GPIO_NUM_13
 #define M2_LPWM_PIN             GPIO_NUM_12
 #define M2_RPWM_CHANNEL         LEDC_CHANNEL_2
@@ -51,7 +50,7 @@ extern "C" {
 #endif
 
 void ledc_init(void);
-void motor_control(ledc_channel_t rpwm_ch, ledc_channel_t lpwm_ch, gpio_num_t ren_pin, gpio_num_t len_pin, int direction, int duty);
+void motor_control(ledc_channel_t rpwm_ch, ledc_channel_t lpwm_ch, gpio_num_t en_pin, int direction, int duty);
 
 #ifdef __cplusplus
 }

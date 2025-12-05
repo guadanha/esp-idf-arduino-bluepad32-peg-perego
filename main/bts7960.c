@@ -43,18 +43,18 @@ void ledc_init(void) {
 /**
  * @brief Controla a direção, velocidade e freio de um motor.
  */
-void motor_control(ledc_channel_t rpwm_ch, ledc_channel_t lpwm_ch, gpio_num_t ren_pin, gpio_num_t len_pin, int direction, int duty_) {
+void motor_control(ledc_channel_t rpwm_ch, ledc_channel_t lpwm_ch, gpio_num_t ren_pin, gpio_num_t len_pin, int direction, int duty) {
     //acell rampup
-    static int duty = 150;
-    if (duty_ == 0) {
-        duty = 150;
-    } else if (duty > duty_) {
-        duty = duty_;
-    } else if (duty <= (duty_ + 50)) {
-        duty = duty + 50;
-    } else {
-        duty = duty_;
-    }
+    //static int duty = 100;
+    //if (duty_ == 0) {
+    //    duty = 100;
+    //} else if (duty > duty_) {
+    //    duty = duty_;
+    //} else if (duty <= (duty_ + 50)) {
+    //    duty = duty + 50;
+    //} else {
+    //    duty = duty_;
+    //}
 
     // defencive programmer
     if (duty > MAX_DUTY) {
